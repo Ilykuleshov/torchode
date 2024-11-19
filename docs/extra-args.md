@@ -21,7 +21,7 @@ t_eval = torch.stack((torch.linspace(0, 5, n_steps), torch.linspace(3, 4, n_step
 decay_rate = torch.tensor([0.1, 5.0])
 
 problem = to.InitialValueProblem(y0=y0, t_eval=t_eval)
-sol = solver.solve(problem, args=decay_rate)
+sol = solver(problem, args=decay_rate)
 
 pp.plot(sol.ts[0], sol.ys[0])
 pp.plot(sol.ts[1], sol.ys[1])

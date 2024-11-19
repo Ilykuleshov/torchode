@@ -52,7 +52,7 @@ class StepSizeController(nn.Module, Generic[ControllerState]):
         """
         raise NotImplementedError()
 
-    def adapt_step_size(
+    def forward(
         self,
         t0: TimeTensor,
         dt: TimeTensor,
@@ -149,7 +149,7 @@ class FixedStepController(StepSizeController[FixedStepState]):
         )
 
     @torch.jit.export
-    def adapt_step_size(
+    def forward(
         self,
         t0: TimeTensor,
         dt: TimeTensor,
@@ -368,7 +368,7 @@ class IntegralController(nn.Module):
         return dt0, self.initial_state(method_order, problem, dt_min, dt_max), f0
 
     @torch.jit.export
-    def adapt_step_size(
+    def forward(
         self,
         t0: TimeTensor,
         dt: TimeTensor,
@@ -456,7 +456,7 @@ class IntegralController(nn.Module):
         assert term is not None
 
         norm = self.norm
-        f0 = term.vf(t0, y0, stats, args)
+        f0 = term.forward(t0, y0, stats, args)
 
         error_bounds = torch.add(self.atol, torch.abs(y0), alpha=self.rtol)
         inv_scale = torch.reciprocal(error_bounds)
@@ -471,7 +471,7 @@ class IntegralController(nn.Module):
         dt0 = torch.minimum(dt0, dt_max.to(dtype=y0.dtype))
 
         y1 = torch.addcmul(y0, (direction * dt0)[:, None], f0)
-        f1 = term.vf(
+        f1 = term.forward(
             torch.addcmul(t0, direction.to(dtype=t0.dtype), dt0.to(dtype=t0.dtype)),
             y1,
             stats,
@@ -713,7 +713,7 @@ class PIDController(nn.Module):
         return dt0, self.initial_state(method_order, problem, dt_min, dt_max), f0
 
     @torch.jit.export
-    def adapt_step_size(
+    def forward(
         self,
         t0: TimeTensor,
         dt: TimeTensor,
@@ -801,7 +801,7 @@ class PIDController(nn.Module):
         assert term is not None
 
         norm = self.norm
-        f0 = term.vf(t0, y0, stats, args)
+        f0 = term.forward(t0, y0, stats, args)
 
         error_bounds = torch.add(self.atol, torch.abs(y0), alpha=self.rtol)
         inv_scale = torch.reciprocal(error_bounds)
@@ -816,7 +816,7 @@ class PIDController(nn.Module):
         dt0 = torch.minimum(dt0, dt_max.to(dtype=y0.dtype))
 
         y1 = torch.addcmul(y0, (direction * dt0)[:, None], f0)
-        f1 = term.vf(
+        f1 = term.forward(
             torch.addcmul(t0, direction.to(dtype=t0.dtype), dt0.to(dtype=t0.dtype)),
             y1,
             stats,

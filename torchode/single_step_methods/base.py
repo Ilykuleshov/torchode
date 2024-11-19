@@ -29,7 +29,7 @@ class SingleStepMethod(nn.Module, Generic[MethodState, InterpolationData]):
     ) -> MethodState:
         raise NotImplementedError()
 
-    def step(
+    def forward(
         self,
         term: Optional[ODETerm],
         running: AcceptTensor,

@@ -28,7 +28,7 @@ def test_evaluates_term_at_correct_nodes():
     state = method.init(None, problem, None, stats=stats, args=None)
     dt = torch.tensor([1.0, 1.0])
     running = torch.ones(2, dtype=torch.bool)
-    result, _, _, status = method.step(
+    result, _, _, status = method(
         None, running, problem.y0, problem.t_start, dt, state, stats=stats, args=None
     )
 

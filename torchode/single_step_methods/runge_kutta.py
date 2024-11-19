@@ -197,7 +197,7 @@ class ExplicitRungeKutta(nn.Module):
             assert term_ is not None
 
             if f0 is None:
-                prev_vf1 = term_.vf(problem.t_start, problem.y0, stats, args)
+                prev_vf1 = term_.forward(problem.t_start, problem.y0, stats, args)
             else:
                 prev_vf1 = f0
         else:
@@ -224,7 +224,7 @@ class ExplicitRungeKutta(nn.Module):
             )
 
     @torch.jit.export
-    def step(
+    def forward(
         self,
         term: Optional[ODETerm],
         running: AcceptTensor,
@@ -250,7 +250,7 @@ class ExplicitRungeKutta(nn.Module):
         vf0 = (
             prev_vf1
             if tableau.fsal and prev_vf1 is not None
-            else term_.vf(t0, y0, stats, args)
+            else term_.forward(t0, y0, stats, args)
         )
         y_i = y0
         k = vf0.new_empty((tableau.n_stages, vf0.shape[0], vf0.shape[1]))
@@ -260,7 +260,7 @@ class ExplicitRungeKutta(nn.Module):
         for i in range(1, tableau.n_stages):
             y_i = torch.einsum("j, jbf -> bf", a[i, :i], k[:i])
             y_i = torch.addcmul(y0, dt_data[:, None], y_i)
-            k[i] = term_.vf(t_nodes[i], y_i, stats, args)
+            k[i] = term_.forward(t_nodes[i], y_i, stats, args)
 
         if tableau.ssal:
             y1 = y_i

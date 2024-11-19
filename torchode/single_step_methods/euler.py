@@ -39,7 +39,7 @@ class Euler(nn.Module):
         return None
 
     @torch.jit.export
-    def step(
+    def forward(
         self,
         term: Optional[ODETerm],
         running: AcceptTensor,
@@ -60,7 +60,7 @@ class Euler(nn.Module):
         # Convert dt into the data dtype for dtype stability
         dt_data = dt.to(dtype=y0.dtype)
 
-        y1 = torch.addcmul(y0, dt_data[:, None], term_.vf(t0, y0, stats, args))
+        y1 = torch.addcmul(y0, dt_data[:, None], term_.forward(t0, y0, stats, args))
 
         return (
             StepResult(y1, None),

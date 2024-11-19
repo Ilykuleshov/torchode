@@ -29,7 +29,7 @@ def test_evaluates_solution_at_evaluation_points():
     step_size_controller = StubStepSizeController(0.3, 0.3, True, Status.SUCCESS.value)
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [7, 7, 7]
@@ -47,7 +47,7 @@ def test_odes_step_independently():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [3, 7]
@@ -63,7 +63,7 @@ def test_multiple_evaluation_points_in_single_step():
     step_size_controller = StubStepSizeController(0.1, 0.5, True, Status.SUCCESS.value)
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [3]
@@ -85,7 +85,7 @@ def test_multiple_evals_on_the_last_step():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [1, 1, 2]
@@ -106,7 +106,7 @@ def test_no_t_eval_evaluates_at_t_end():
     step_size_controller = StubStepSizeController(dt, dt, True, Status.SUCCESS.value)
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [20, 16, 3]
@@ -125,7 +125,7 @@ def test_terminates_after_max_steps():
     y = lambda t, *args: y0[args[0]] if len(args) > 0 else y0
     step_method = StubStepMethod(y, Status.SUCCESS.value)
     adjoint = AutoDiffAdjoint(step_method, FixedStepController(), max_steps=7)
-    solution = adjoint.solve(problem, dt0=torch.ones(2))
+    solution = adjoint.forward(problem, dt0=torch.ones(2))
 
     assert solution.status.tolist() == [
         Status.SUCCESS.value,
@@ -145,7 +145,7 @@ def test_rejected_steps_continue_at_same_place():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     step_times = torch.stack([args[0][3] for args in step_method.step.call_args_list])
     expected_step_times = [
@@ -180,7 +180,7 @@ def test_value_is_only_saved_when_step_is_accepted():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [3, 1, 2]
@@ -202,7 +202,7 @@ def test_rejection_of_initial_step_does_not_skip_evaluation_at_t_start():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert (solution.status == Status.SUCCESS.value).all()
     assert solution.stats["n_steps"].tolist() == [3, 5]
@@ -228,7 +228,7 @@ def test_stops_on_non_successful_step_method():
     step_size_controller = StubStepSizeController(0.2, 0.2, True, Status.SUCCESS.value)
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert solution.status.tolist() == [
         Status.SUCCESS.value,
@@ -254,7 +254,7 @@ def test_finished_solves_do_not_update_dt():
         step_method,
         IntegralController(atol=1.0, rtol=0.0, term=term),
     )
-    solution = adjoint.solve(problem, dt0=torch.ones(2))
+    solution = adjoint.forward(problem, dt0=torch.ones(2))
 
     assert solution.status.tolist() == [Status.SUCCESS.value, Status.SUCCESS.value]
     dts = torch.stack([args[0][2] for args in step.call_args_list])
@@ -274,15 +274,15 @@ def test_solution_is_only_evaluated_inside_of_integration_range():
     )
     t_start, t_end = t_eval.T
     y, term, problem = get_problem("sine", t_eval)
-    term.vf = Mock(side_effect=term.vf)
+    term.forward = Mock(side_effect=term.forward)
     step_method = Dopri5(term=term)
     dt = [0.1, 0.4, -0.02]
     step_size_controller = StubStepSizeController(
         dt, dt, True, [Status.SUCCESS.value] * len(t_eval)
     )
 
-    solution = AutoDiffAdjoint(step_method, step_size_controller).solve(problem)
-    eval_times = torch.stack([args[0][0] for args in term.vf.call_args_list])
+    solution = AutoDiffAdjoint(step_method, step_size_controller).forward(problem)
+    eval_times = torch.stack([args[0][0] for args in term.forward.call_args_list])
 
     t_min, t_max = torch.minimum(t_start, t_end), torch.maximum(t_start, t_end)
     assert (eval_times >= t_min).all()
@@ -308,7 +308,7 @@ def test_stops_on_non_successful_adapt_step_size():
     )
 
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     assert solution.status.tolist() == [
         Status.GENERAL_ERROR.value,
@@ -324,7 +324,7 @@ def test_inverting_time_inverts_dynamics():
     step_method = Dopri5(term)
     step_size_controller = IntegralController(1e-8, 1e-8, term=term)
     adjoint = AutoDiffAdjoint(step_method, step_size_controller)
-    solution = adjoint.solve(problem)
+    solution = adjoint.forward(problem)
 
     problem_inv = InitialValueProblem(
         solution.ys[:, -1],
@@ -332,7 +332,7 @@ def test_inverting_time_inverts_dynamics():
         t_end=problem.t_start,
         t_eval=torch.flip(problem.t_eval, dims=(1,)),
     )
-    solution_inv = adjoint.solve(problem_inv)
+    solution_inv = adjoint.forward(problem_inv)
 
     assert solution.status.tolist() == [
         Status.SUCCESS.value,
@@ -362,7 +362,7 @@ def test_solving_in_opposite_directions_at_the_same_time(controller):
     )
     step_method = Dopri5()
     adjoint = AutoDiffAdjoint(step_method, controller)
-    solution = adjoint.solve(problem, term=term)
+    solution = adjoint.forward(problem, term=term)
 
     expected = [[1.0, 7.0, 11.0], [9.0, 6.0, -11.0]]
     assert solution.ys.squeeze(dim=-1).numpy() == approx(np.array(expected))
@@ -391,7 +391,7 @@ def test_backsolve_adjoint_with_fixed_step_controller(dt0, bw_dt0):
     dt0 = torch.full((2,), dt0) if dt0 is not None else None
     bw_dt0 = torch.full((2,), bw_dt0) if bw_dt0 is not None else None
 
-    solution = adjoint.solve(problem, term=term, dt0=dt0, backward_dt0=bw_dt0)
+    solution = adjoint.forward(problem, term=term, dt0=dt0, backward_dt0=bw_dt0)
 
     # Test backward as well
     solution.ys.mean().backward()
@@ -416,7 +416,7 @@ def test_gradients_with_t_eval(adjoint):
             adjoint_ = BacksolveAdjoint(term, step_method, step_size_controller)
         elif adjoint == "joint-backsolve":
             adjoint_ = JointBacksolveAdjoint(term, step_method, step_size_controller)
-        solution = adjoint_.solve(problem, term=term)
+        solution = adjoint_.forward(problem, term=term)
 
         return solution.ys.mean()
 
@@ -461,7 +461,7 @@ def test_gradients_without_t_eval(adjoint):
             adjoint_ = BacksolveAdjoint(term, step_method, step_size_controller)
         elif adjoint == "joint-backsolve":
             adjoint_ = JointBacksolveAdjoint(term, step_method, step_size_controller)
-        solution = adjoint_.solve(problem, term=term)
+        solution = adjoint_.forward(problem, term=term)
 
         return solution.ys.mean()
 

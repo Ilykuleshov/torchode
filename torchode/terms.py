@@ -47,7 +47,7 @@ class ODETerm(nn.Module):
             problem.batch_size, device="cpu", dtype=torch.long
         )
 
-    def vf(
+    def forward(
         self, t: TimeTensor, y: DataTensor, stats: Dict[str, Any], args: Any
     ) -> DataTensor:
         """Evaluate the vector field."""

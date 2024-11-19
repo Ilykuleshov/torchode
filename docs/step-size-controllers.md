@@ -17,7 +17,7 @@ step_method = to.Tsit5(term=term)
 step_size_controller = to.IntegralController(atol=1e-6, rtol=1e-3, term=term)
 solver = to.AutoDiffAdjoint(step_method, step_size_controller)
 problem = to.InitialValueProblem(...)
-sol = solver.solve(problem)
+sol = solver(problem)
 ```
 
 If you work with stiff dynamics, the more general `PIDController` might be useful and save a few solver steps as we have explored in [our paper](https://arxiv.org/abs/2210.12375). To use it, just drop it in as a replacement for the `IntegralController`.
@@ -28,11 +28,11 @@ step_size_controller = to.PIDController(atol=1e-6, rtol=1e-3, pcoeff=0.2, icoeff
 
 ## Fixed Step Size
 
-If you know a good step size or want to ensure constant progress of the solver at the cost of error control, you can also fix a step size yourself with the `FixedStepController`. The important difference is that you now have to provide an initial step size to `solver.solve` which will also be used for all further steps.
+If you know a good step size or want to ensure constant progress of the solver at the cost of error control, you can also fix a step size yourself with the `FixedStepController`. The important difference is that you now have to provide an initial step size to `solver` which will also be used for all further steps.
 
 ```python
 step_size_controller = to.FixedStepController()
 solver = to.AutoDiffAdjoint(step_method, step_size_controller)
 dt0 = torch.full((batch_size,), 0.01)
-sol = solver.solve(problem, dt0=dt0)
+sol = solver(problem, dt0=dt0)
 ```

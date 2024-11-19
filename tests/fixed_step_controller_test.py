@@ -12,7 +12,7 @@ def test_solve_with_fixed_steps(step_method):
     controller = FixedStepController()
     adjoint = AutoDiffAdjoint(step_method(), controller)
     dt0 = torch.tensor([0.01, 0.005])
-    solution = adjoint.solve(problem, term, dt0)
+    solution = adjoint.forward(problem, term, dt0)
 
     assert solution.status.tolist() == [Status.SUCCESS.value] * 2
     assert (solution.ts == problem.t_eval).all()

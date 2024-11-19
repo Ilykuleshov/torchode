@@ -48,7 +48,7 @@ class StubStepMethod(SingleStepMethod[SSMState, SSMInterpolationData]):
         self.status = EnsureShape(self.status, shape=shape)
         return SSMState()
 
-    def step(self, term, running, y, t, dt, state, *, stats, args):
+    def forward(self, term, running, y, t, dt, state, *, stats, args):
         y1 = self.f(t)
         if self.error is None:
             error_estimate = torch.zeros_like(y1)
@@ -109,7 +109,7 @@ class StubStepSizeController(StepSizeController):
 
         return self.dt0.expand(shape), {}, None
 
-    def adapt_step_size(self, t0, dt, y0, step_result, state, stats):
+    def forward(self, t0, dt, y0, step_result, state, stats):
         return (
             self.accept(t0, dt, y0, step_result),
             self.dt(t0, dt, y0, step_result),

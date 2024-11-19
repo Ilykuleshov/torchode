@@ -94,4 +94,4 @@ def solve_ivp(
     if t_end.ndim == 0:
         t_end = t_end.expand(batch_size)
     problem = InitialValueProblem(y0, t_start, t_end, t_eval)
-    return adjoint.solve(problem, term, dt0=dt0, args=args)
+    return adjoint.forward(problem, term, dt0=dt0, args=args)

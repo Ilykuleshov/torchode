@@ -27,7 +27,7 @@ def f(t, y, args)
 
 term = to.ODETerm(f, with_args=True)
 problem = to.InitialValueProblem(y0=y0.flatten(start_dim=1), t_eval=..)
-sol = solver.solve(problem, args=(c, w, h))
+sol = solver(problem, args=(c, w, h))
 ```
 
 If you are willing to contribute a small utility that does this shape flattening and

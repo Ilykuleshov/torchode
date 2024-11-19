@@ -32,7 +32,7 @@ def test_data_and_time_dtypes_are_not_mixed(time_dtype, data_dtype, step_method)
     )
     step_size_controller = PIDController(1e-6, 0.0, 0.3, 0.6, 0.0)
     adjoint = AutoDiffAdjoint(step_method(), step_size_controller)
-    solution = adjoint.solve(problem, term)
+    solution = adjoint.forward(problem, term)
 
     # Ensure that we took at least a few steps, so that things "get the chance" to be
     # mixed up

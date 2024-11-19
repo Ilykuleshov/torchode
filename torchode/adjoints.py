@@ -13,7 +13,7 @@ from .typing import *
 
 
 class Adjoint:
-    def solve(
+    def forward(
         self,
         problem: InitialValueProblem,
         term: Optional[ODETerm] = None,
@@ -40,7 +40,7 @@ class AutoDiffAdjoint(nn.Module):
         self.backprop_through_step_size_control = backprop_through_step_size_control
 
     @torch.jit.export
-    def solve(
+    def forward(
         self,
         problem: InitialValueProblem,
         term: Optional[ODETerm] = None,
@@ -133,11 +133,11 @@ class AutoDiffAdjoint(nn.Module):
         # point or any of them failed
         max_steps = self.max_steps
         while True:
-            step_out = step_method.step(
+            step_out = step_method(
                 term, running, y, t, dt, method_state, stats=stats, args=args
             )
             step_result, interp_data, method_state_next, method_status = step_out
-            controller_out = step_size_controller.adapt_step_size(
+            controller_out = step_size_controller(
                 t, dt, y, step_result, controller_state, stats
             )
             accept, dt_next, controller_state_next, controller_status = controller_out
@@ -207,8 +207,8 @@ class AutoDiffAdjoint(nn.Module):
             # Evaluate the solution at all evaluation points that have been passed in
             # this step.
             #
-            # This causes a blocking CPU-GPU sync point at to_be_evaluated.any 
-            # when t_eval is not None, but deferring this sync doesn't seem to 
+            # This causes a blocking CPU-GPU sync point at to_be_evaluated.any
+            # when t_eval is not None, but deferring this sync doesn't seem to
             # yield a speedup. A sync is necessary at each evaluation point anyway
             # since nonzero produces a variable-shape result.
             # See https://github.com/martenlienen/torchode/issues/46
@@ -363,7 +363,7 @@ class BacksolveFunction(torch.autograd.Function):
 
         problem = InitialValueProblem(y0, t_start, t_end, t_eval)
         with torch.no_grad():
-            solution = solver.solve(problem, dt0=dt0, args=args, term=term)
+            solution = solver(problem, dt0=dt0, args=args, term=term)
 
         ctx.stats = solution.stats
         ctx.save_for_backward(
@@ -394,7 +394,7 @@ class BacksolveFunction(torch.autograd.Function):
                 problem = InitialValueProblem(
                     aug_state, t_start=t_end, t_end=t_start, t_eval=None
                 )
-                solution = aug_solver.solve(
+                solution = aug_solver(
                     problem, dt0=dt0, args=(shapes, args), term=aug_term
                 )
                 aug_state = solution.ys[:, -1]
@@ -408,7 +408,7 @@ class BacksolveFunction(torch.autograd.Function):
                         t_end=t_eval[:, i - 1],
                         t_eval=None,
                     )
-                    solution = aug_solver.solve(
+                    solution = aug_solver(
                         problem, dt0=dt0, args=(shapes, args), term=aug_term
                     )
                     aug_state = solution.ys[:, -1]
@@ -475,7 +475,7 @@ class AugmentedDynamicsTerm(nn.Module):
     def init(self, problem: InitialValueProblem, stats: Dict[str, Any]):
         return self.term.init(problem, stats)
 
-    def vf(
+    def forward(
         self, t: TimeTensor, y: DataTensor, stats: Dict[str, Any], args: Any
     ) -> DataTensor:
         shapes, args = args
@@ -504,7 +504,7 @@ class BacksolveAdjoint(nn.Module):
         self.forward_adjoint = AutoDiffAdjoint(step_method, step_size_controller)
         self.backward_adjoint = AutoDiffAdjoint(step_method, step_size_controller)
 
-    def solve(
+    def forward(
         self,
         problem: InitialValueProblem,
         term: Optional[ODETerm] = None,
@@ -548,7 +548,7 @@ class UnwrappingODETerm(nn.Module):
     def init(self, problem: InitialValueProblem, stats: Dict[str, Any]):
         return self.term.init(problem, stats)
 
-    def vf(
+    def forward(
         self, t: TimeTensor, y: DataTensor, stats: Dict[str, Any], args: Any
     ) -> DataTensor:
         """Evaluate the vector field."""
@@ -558,7 +558,7 @@ class UnwrappingODETerm(nn.Module):
         # integration intervals
         t = torch.addcmul(t_intercept, t_slope, t)
 
-        dy = self.term.vf(t, y[0].reshape((batch_size, -1)), stats, term_args)
+        dy = self.term(t, y[0].reshape((batch_size, -1)), stats, term_args)
 
         # Correct the y-derivative for the distortion through the linear mapping
         # according to the substitution rule
@@ -572,12 +572,12 @@ class JointAugmentedDynamicsTerm(nn.Module):
         super().__init__()
 
         self.term = term
-        self.parameters = list(self.term.parameters())
+        self.params = list(self.term.parameters())
 
     def init(self, problem: InitialValueProblem, stats: Dict[str, Any]):
         return self.term.init(problem, stats)
 
-    def vf(
+    def forward(
         self, t: TimeTensor, y: DataTensor, stats: Dict[str, Any], args: Any
     ) -> DataTensor:
         shapes, term_args = args
@@ -587,10 +587,10 @@ class JointAugmentedDynamicsTerm(nn.Module):
         with torch.enable_grad():
             t_ = t.detach().requires_grad_()
             y_ = y.detach().requires_grad_()
-            dy = self.term.vf(t_, y_, stats, term_args)
+            dy = self.term(t_, y_, stats, term_args)
             vjp_t, vjp_y, *vjp_params = torch.autograd.grad(
                 dy,
-                [t_, y_] + self.parameters,
+                [t_, y_] + self.params,
                 -adj_y,
                 allow_unused=True,
                 retain_graph=True,
@@ -602,7 +602,7 @@ class JointAugmentedDynamicsTerm(nn.Module):
             vjp_y = torch.zeros_like(y)
         vjp_params = [
             vp if vp is not None else torch.zeros_like(p)
-            for p, vp in zip(self.parameters, vjp_params)
+            for p, vp in zip(self.params, vjp_params)
         ]
 
         dy_joint = dy.flatten()[None]
@@ -619,7 +619,7 @@ class JointBacksolveAdjoint(nn.Module):
         self.forward_loop = AutoDiffAdjoint(step_method, step_size_controller)
         self.backward_loop = AutoDiffAdjoint(step_method, step_size_controller)
 
-    def solve(
+    def forward(
         self,
         problem: InitialValueProblem,
         term: Optional[ODETerm] = None,

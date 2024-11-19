@@ -17,7 +17,7 @@ def test_can_be_jitted_with_torch_script(step_method):
     jitted = torch.compile(adjoint)
 
     dt0 = torch.tensor([0.01, 0.01]) if step_method is Euler else None
-    solution = adjoint.solve(problem, dt0=dt0)
+    solution = adjoint.forward(problem, dt0=dt0)
     solution_jit = jitted.solve(problem, dt0=dt0)
 
     assert solution.ts == approx(solution_jit.ts)
@@ -40,7 +40,7 @@ def test_passing_term_dynamically_equals_fixed_term(step_method):
 
     controller = IntegralController(1e-3, 1e-3)
     adjoint = AutoDiffAdjoint(step_method(None), controller)
-    solution = adjoint.solve(problem, term, dt0=dt0)
+    solution = adjoint.forward(problem, term, dt0=dt0)
 
     controller_jit = IntegralController(1e-3, 1e-3, term=term)
     adjoint_jit = AutoDiffAdjoint(step_method(term), controller_jit)
